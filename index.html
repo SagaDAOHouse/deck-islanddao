@@ -146,6 +146,31 @@ document.addEventListener('DOMContentLoaded', async function() {
     // createElement so they execute, awaiting onload for src scripts to
     // preserve ordering (React before ReactDOM before Babel before text/babel).
     const doc = new DOMParser().parseFromString(template, 'text/html');
+
+    // iOS-only perf prelude. iPhone/iPad Safari freezes during pinch-zoom when
+    // a descendant claims `touch-action: none` (gesture decision stalls) or
+    // when the page lacks a proper viewport meta (re-rasterization hits the
+    // GPU layer budget). These overrides target only iOS WebKit and don't
+    // change rendering on Android/desktop, where the deck already works.
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const headEl = doc.head;
+    if (headEl) {
+      if (!headEl.querySelector('meta[name="viewport"]')) {
+        const m = doc.createElement('meta');
+        m.name = 'viewport';
+        m.content = 'width=device-width, initial-scale=1, viewport-fit=cover';
+        headEl.appendChild(m);
+      }
+      if (isIOS) {
+        const s = doc.createElement('style');
+        s.textContent =
+          'html, body { -webkit-text-size-adjust: 100%; touch-action: pinch-zoom pan-x pan-y !important; }' +
+          '*, *::before, *::after { -webkit-tap-highlight-color: transparent; }';
+        headEl.appendChild(s);
+      }
+    }
+
     document.documentElement.replaceWith(doc.documentElement);
     const dead = Array.from(document.scripts);
     for (const old of dead) {
